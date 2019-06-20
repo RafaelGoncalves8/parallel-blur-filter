@@ -1,29 +1,46 @@
 #include "blur.h"
 #include "imageprocessing.h"
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define MAX 100
+
+void cut_last_word(char delimiter, char* s, char* out)
+{
+  int i, j, len;
+  int del_idx = 0;
+
+  i = 0;
+  while (s[i] != '\0')
+  {
+    if (s[i] == delimiter)
+      del_idx = i;
+    i++;
+  }
+  len = i;
+
+  j = 0;
+  for (i = del_idx+1; i < len+1; i++)
+    out[j++] = s[i];
+}
 
 int main(int argc, char *argv[]) {
-  imagem *img, *out;
+  imagem img, *out;
   int i;
+  char str[MAX];
+  char last_word[MAX];
 
-  img = (imagem *) malloc(sizeof(imagem) * argc);
-  for (i = 0, i < argc; i++)
-    img[i] = abrir_imagem(argv[i]);
+  for (i = 1; i < argc; i++)
+  {
+    img = abrir_imagem(argv[i]);
+    out = create_image(img.width, img.height);
+    blur_image(&img, out);
+    strcpy(str, "out-");
+    cut_last_word('/', argv[i], last_word);
+    strcat(str, last_word);
+    salvar_imagem(str, out);
+  }
 
-#if DEBUG
-  printf("%d, %d, %f, %f\n", img.width, img.height, img.r[0], img.r[img.width + img.height -1]);
-#endif
-
-  out = create_image(img.width, img.height);
-  blur_image(&img, out);
-
-#if DEBUG
-  printf("%d, %d", out->width, out->height);
-  printf(" %f, %f\n", out->r[0], out->r[out->width + out->height -1]);
-#endif
-
-  salvar_imagem("00-out.jpg", out);
-  liberar_imagem(&img);
-  liberar_imagem(out);
   return 0;
 }
