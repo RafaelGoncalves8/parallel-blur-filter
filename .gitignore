@@ -1,3 +1,10 @@
+# tex
+*.aux
+*.log
+
+# ouput folder
+out/
+
 # Prerequisites
 *.d
 
