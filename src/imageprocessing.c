@@ -1,9 +1,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-
 #include "imageprocessing.h"
-
 #include <FreeImage.h>
 
 /*
@@ -50,6 +48,8 @@ imagem abrir_imagem(char *nome_do_arquivo) {
   return I;
 
 }
+
+
 
 void liberar_imagem(imagem *I) {
   free(I->r);
