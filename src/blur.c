@@ -1,9 +1,15 @@
 #include "imageprocessing.h"
+#include "blur.h"
 #include <stdlib.h>
 
 imagem *create_image(int width, int height)
 {
   imagem *I;
+
+  I = (imagem *) malloc(sizeof(imagem));
+  if (I == NULL)
+    exit(-1);
+
   I->width = width;
   I->height = height;
   I->r = (float *) malloc(sizeof(float) * I->width * I->height);
@@ -37,21 +43,40 @@ float blur(float *image, int x, int y, int width, int height)
   return total;
 }
 
-
-imagem *blur_image(imagem *I)
+void blur_image(imagem *I)
 {
   imagem *output;
   output = create_image(I->width, I->height);
 
-  for(int j=0;j<I->height-2;j++)
+  for (int i = 0; i < I->width; i++)
   {
-    for(int i=0;i<I->width-2;i++)
+    output->r[i*I->width] = 0;
+    output->r[i*I->width + I->height -1] = 0;
+    output->g[i*I->width] = 0;
+    output->g[i*I->width + I->height -1] = 0;
+    output->b[i*I->width] = 0;
+    output->b[i*I->width + I->height -1] = 0;
+  }
+
+  for (int j = 0; j < I->height; j++)
+  {
+    output->r[j] = 0;
+    output->r[I->width -1 + j] = 0;
+    output->g[j] = 0;
+    output->g[I->width -1 + j] = 0;
+    output->b[j] = 0;
+    output->b[I->width -1 + j] = 0;
+  }
+
+  for(int i=0;i<I->height-2;i++)
+  {
+    for(int j=0;j<I->width-2;j++)
     {
-      output->r[(j+1)*I->width+i+1] = blur(I->r, i, j, I->width, I->height);
-      output->b[(j+1)*I->width+i+1] = blur(I->b, i, j, I->width, I->height);
-      output->g[(j+1)*I->width+i+1] = blur(I->g, i, j, I->width, I->height);
+      output->r[(i+1)*I->width+j+1] = blur(I->r, i, j, I->width, I->height);
+      output->b[(i+1)*I->width+j+1] = blur(I->b, i, j, I->width, I->height);
+      output->g[(i+1)*I->width+j+1] = blur(I->g, i, j, I->width, I->height);
     }
   }
   liberar_imagem(I);
-  return output;
+  I = output;
 }
