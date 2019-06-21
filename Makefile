@@ -9,10 +9,16 @@ TARGET=./main
 MAIN=$(SRC)/main.c
 BLUR=$(SRC)/blur.c
 IMG_PROC=$(SRC)/imageprocessing.c
+TEST=./test.sh
 
-all:$(BLUR) $(IMG_PROC) $(MAIN)
+all:$(TARGET)
+
+test:$(TARGET)
+	$(TEST)
+
+$(TARGET):$(BLUR) $(IMG_PROC) $(MAIN)
 	$(CC) -o$(TARGET) $(MAIN) $(BLUR) $(IMG_PROC) $(CFLAGS)
-	
+
 clean:
 	$(RM) $(TARGET)
 	$(RM) $(OUT)/*
