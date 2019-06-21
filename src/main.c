@@ -31,12 +31,19 @@ int main(int argc, char *argv[]) {
   char str[MAX];
   char last_word[MAX];
 
-  for (i = 1; i < argc; i++)
+  for (i = 2; i < argc; i++)
   {
     img = abrir_imagem(argv[i]);
     out = create_image(img.width, img.height);
-    blur_image(&img, out);
-    strcpy(str, "out-");
+
+    if (argv[1][0] == 't')
+      i++; /* blur_thread_(&img, out, N); */
+    else if (argv[1][0] == 'p')
+      i++; /* blur_process_(&img, out, N); */
+    else
+      blur_image(&img, out);
+
+    strcpy(str, "out/");
     cut_last_word('/', argv[i], last_word);
     strcat(str, last_word);
     salvar_imagem(str, out);
