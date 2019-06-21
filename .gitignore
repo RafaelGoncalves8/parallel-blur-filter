@@ -4,6 +4,7 @@
 
 # ouput folder
 out/
+main
 
 # Prerequisites
 *.d
