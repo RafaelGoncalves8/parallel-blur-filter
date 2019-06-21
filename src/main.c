@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #define MAX 100
+#define N 3
 
 void cut_last_word(char delimiter, char* s, char* out)
 {
@@ -37,9 +38,9 @@ int main(int argc, char *argv[]) {
     out = create_image(img.width, img.height);
 
     if (argv[1][0] == 't')
-      i++; /* blur_thread_(&img, out, N); */
+      blur_thread(&img, out, N);
     else if (argv[1][0] == 'p')
-      i++; /* blur_process_(&img, out, N); */
+      i++; /* blur_process(&img, out, N); */
     else
       blur_image(&img, out);
 

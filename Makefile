@@ -1,6 +1,6 @@
 # Compilation macros
 CC=gcc
-CFLAGS=-Wextra -lfreeimage
+CFLAGS=-Wextra -lfreeimage -lpthread
 
 SRC=src
 OUT=out
