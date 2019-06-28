@@ -2,34 +2,48 @@
 #include "blur.h"
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 
 #define N 9
-#define PAD 2
+#define PAD (N-1)/2
 
 pthread_mutex_t key;
 
-void create_padding(imagem *I)
+void create_padding(imagem *I, int *aux)
 {
   for (int k = 0; k < PAD; k++)
   {
     for (int j = 0; j < I->width; j++)
     {
       I->r[(I->width)*k + j] = 0;
-      I->r[(I->height-k-1)*I->width + j] = 0;
+      I->r[(I->height-(k+1))*I->width + j] = 0;
       I->g[(I->width)*k + j] = 0;
-      I->g[(I->height-k-1)*I->width + j] = 0;
+      I->g[(I->height-(k+1))*I->width + j] = 0;
       I->b[(I->width)*k + j] = 0;
-      I->b[(I->height-k-1)*I->width + j] = 0;
+      I->b[(I->height-(k+1))*I->width + j] = 0;
+      /* if (aux != NULL) */
+      /* { */
+      /*   aux[(I->width)*k + j] = 1; */
+      /*   aux[(I->height)-(k+1)*I->width + j] = 1; */
+      /* } */
     }
 
     for (int i = 0; i < I->height; i++)
     {
       I->r[i*I->width + k] = 0;
-      I->r[I->width*i + (I->width - k - 1)] = 0;
+      I->r[I->width*i + (I->width - (k + 1))] = 0;
       I->g[i*I->width + k] = 0;
-      I->g[I->width*i + (I->width - k - 1)] = 0;
+      I->g[I->width*i + (I->width - (k + 1))] = 0;
       I->b[i*I->width + k] = 0;
-      I->b[I->width*i + (I->width - k - 1)] = 0;
+      I->b[I->width*i + (I->width - (k + 1))] = 0;
+      /* if (aux != NULL) */
+      /* { */
+      /*   aux[i*I->width + k] = 1; */
+      /*   aux[I->width*i + (I->width - (k + 1))] = 1; */
+      /* } */
     }
   }
 }
@@ -58,34 +72,10 @@ imagem *create_image(int width, int height)
 float blur(float *image, int x, int y, int width, int height)
 {
   float total = 0;
-  /* Average. */
-  /* float filter[25] = { */
-  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
-  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
-  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
-  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
-  /*           1/25,   1/25,   1/25,  1/25,  1/25 */
-  /*           }; */
-
-  /* Gaussian. */
-  /* float filter[25] = { */
-  /*           1/256,  4/256,  6/256,  4/256,  1/256, */
-  /*           4/256, 16/256, 24/256, 16/256,  4/256, */
-  /*           6/256, 24/256, 36/256, 24/256,  6/256, */
-  /*           4/256, 16/256, 24/256, 16/256,  5/256, */
-  /*           1/256,  4/256,  6/256,  4/256,  1/256 */
-  /*           }; */
-
   float filter[N*N];
 
   for (int i = 0; i < N*N; i++)
     filter[i] = 1.0/((float) N*N);
-
-  /* int filter[25] = {   1,  1, 1,  1, 1, */
-  /*                        1,  1, 1,  1, 1, */
-  /*                        1,  1,-24, 1, 1, */
-  /*                        1,  1, 1,  1, 1, */
-  /*                        1,  1, 1,  1, 1}; */
 
   for(int i=-N/2; i < N/2+1; i++)
     for(int j =-N/2; j < N/2+1; j++)
@@ -126,6 +116,79 @@ void *worker(void *arg)
   }
 }
 
+int * alloc_mmap(int n)
+{
+  int * ans;
+
+  int protection = PROT_READ | PROT_WRITE;
+  int visibility = MAP_SHARED | MAP_ANON;
+
+  ans = (int*) mmap(NULL, sizeof(int)*n, protection, visibility, 0, 0);
+
+  if ((int) ans == -1)
+    exit(-1);
+
+  return ans;
+}
+
+void blur_process(imagem *I, imagem *output, int n)
+{
+  pid_t *pid;
+  int *aux;
+  imagem *out;
+  int is_undone;
+  int x, y;
+
+  out = create_image(I->width, I->height);
+
+  pid = (pid_t *) malloc(sizeof(pid_t) * n);
+  if (pid == NULL)
+    exit(-1);
+
+  aux = alloc_mmap(I->width * I->height);
+
+  out = alloc_mmap(I->width * I->height);
+
+  create_padding(out, aux);
+
+  for (int i = 0; i < n; i++)
+  {
+    pid[i] = fork();
+
+    /* Child process. */
+    if (pid[i] == 0)
+    {
+      for (int i = 0; i < (I->width)*(I->height); i++)
+      {
+        pthread_mutex_lock(&key);
+        is_undone = (aux[i] == 0);
+        if (is_undone)
+          aux[i] = 1;
+        pthread_mutex_unlock(&key);
+
+        if (is_undone)
+        {
+          x = i/I->width;
+          y = i%I->width;
+          out->r[i] = blur(I->r, x, y, I->width, I->height);
+          out->b[i] = blur(I->b, x, y, I->width, I->height);
+          out->g[i] = blur(I->g, x, y, I->width, I->height);
+        }
+      }
+      exit(0);
+    }
+  }
+
+  /* Wait all processes to finish. */
+  for (int i = 0; i < N; i++)
+    waitpid(pid[i], NULL, 0);
+
+
+  free(output);
+  output = out;
+}
+
+
 void blur_thread(imagem *I, imagem *output, int n)
 {
   pthread_t *workers;
@@ -147,7 +210,7 @@ void blur_thread(imagem *I, imagem *output, int n)
   for (int i = 0; i < (I->width * I->height); i++)
     aux[i] = 0;
 
-  create_padding(output);
+  create_padding(output, aux);
 
   argv->aux = aux;
   argv->img = I;
@@ -167,7 +230,7 @@ void blur_thread(imagem *I, imagem *output, int n)
 void blur_image(imagem *I, imagem *output)
 {
 
-  create_padding(output);
+  create_padding(output, NULL);
 
   for(int i=PAD;i<I->height-2*PAD;i++)
   {

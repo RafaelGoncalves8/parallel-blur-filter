@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     if (argv[1][0] == 't')
       blur_thread(&img, out, N);
     else if (argv[1][0] == 'p')
-      i++; /* blur_process(&img, out, N); */
+      blur_process(&img, out, N); /* blur_process(&img, out, N); */
     else
       blur_image(&img, out);
 
