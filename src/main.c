@@ -35,14 +35,22 @@ int main(int argc, char *argv[]) {
   for (i = 2; i < argc; i++)
   {
     img = abrir_imagem(argv[i]);
-    out = create_image(img.width, img.height);
 
     if (argv[1][0] == 't')
+    {
+      out = create_image(img.width, img.height, 0);
       blur_thread(&img, out, N);
+    }
     else if (argv[1][0] == 'p')
+    {
+      out = create_image(img.width, img.height, 1);
       blur_process(&img, out, N); /* blur_process(&img, out, N); */
+    }
     else
+    {
+      out = create_image(img.width, img.height, 0);
       blur_image(&img, out);
+    }
 
     strcpy(str, "out/");
     cut_last_word('/', argv[i], last_word);

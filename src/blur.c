@@ -12,7 +12,7 @@
 
 pthread_mutex_t key;
 
-void create_padding(imagem *I, int *aux)
+void create_padding(imagem *I)
 {
   for (int k = 0; k < PAD; k++)
   {
@@ -24,11 +24,6 @@ void create_padding(imagem *I, int *aux)
       I->g[(I->height-(k+1))*I->width + j] = 0;
       I->b[(I->width)*k + j] = 0;
       I->b[(I->height-(k+1))*I->width + j] = 0;
-      /* if (aux != NULL) */
-      /* { */
-      /*   aux[(I->width)*k + j] = 1; */
-      /*   aux[(I->height)-(k+1)*I->width + j] = 1; */
-      /* } */
     }
 
     for (int i = 0; i < I->height; i++)
@@ -39,29 +34,43 @@ void create_padding(imagem *I, int *aux)
       I->g[I->width*i + (I->width - (k + 1))] = 0;
       I->b[i*I->width + k] = 0;
       I->b[I->width*i + (I->width - (k + 1))] = 0;
-      /* if (aux != NULL) */
-      /* { */
-      /*   aux[i*I->width + k] = 1; */
-      /*   aux[I->width*i + (I->width - (k + 1))] = 1; */
-      /* } */
     }
   }
 }
 
 
-imagem *create_image(int width, int height)
+imagem *create_image(int width, int height, int is_p)
 {
   imagem *I;
+  int protection = PROT_READ | PROT_WRITE;
+  int visibility = MAP_SHARED | MAP_ANON;
 
-  I = (imagem *) malloc(sizeof(imagem));
-  if (I == NULL)
-    exit(-1);
+  if (is_p == 1)
+  {
+    I = (imagem *) mmap(NULL, sizeof(imagem), protection, visibility, 0, 0);
+    if (I == NULL)
+      exit(-1);
 
-  I->width = width;
-  I->height = height;
-  I->r = (float *) malloc(sizeof(float) * I->width * I->height);
-  I->g = (float *) malloc(sizeof(float) * I->width * I->height);
-  I->b = (float *) malloc(sizeof(float) * I->width * I->height);
+    I->width = width;
+    I->height = height;
+
+    I->r = (float *) mmap(NULL, sizeof(float) * I->width * I->height, protection, visibility, 0, 0);
+    I->g = (float *) mmap(NULL, sizeof(float) * I->width * I->height, protection, visibility, 0, 0);
+    I->b = (float *) mmap(NULL, sizeof(float) * I->width * I->height, protection, visibility, 0, 0);
+  }
+  else
+  {
+    I = (imagem *) malloc(sizeof(imagem));
+    if (I == NULL)
+      exit(-1);
+
+    I->width = width;
+    I->height = height;
+
+    I->r = (float *) malloc(sizeof(float) * I->width * I->height);
+    I->g = (float *) malloc(sizeof(float) * I->width * I->height);
+    I->b = (float *) malloc(sizeof(float) * I->width * I->height);
+  }
 
   if (I->r == NULL || I->g == NULL || I->b == NULL)
     exit(-1);
@@ -123,7 +132,7 @@ int * alloc_mmap(int n)
   int protection = PROT_READ | PROT_WRITE;
   int visibility = MAP_SHARED | MAP_ANON;
 
-  ans = (int*) mmap(NULL, sizeof(int)*n, protection, visibility, 0, 0);
+  ans = (int *) mmap(NULL, sizeof(int), protection, visibility, 0, 0);
 
   if ((int) ans == -1)
     exit(-1);
@@ -135,11 +144,11 @@ void blur_process(imagem *I, imagem *output, int n)
 {
   pid_t *pid;
   int *aux;
-  imagem *out;
   int is_undone;
   int x, y;
 
-  out = create_image(I->width, I->height);
+  int protection = PROT_READ | PROT_WRITE;
+  int visibility = MAP_SHARED | MAP_ANON;
 
   pid = (pid_t *) malloc(sizeof(pid_t) * n);
   if (pid == NULL)
@@ -147,9 +156,24 @@ void blur_process(imagem *I, imagem *output, int n)
 
   aux = alloc_mmap(I->width * I->height);
 
-  out = alloc_mmap(I->width * I->height);
+  for (int i = 0; i < (I->width * I->height); i++)
+    aux[i] = 0;
 
-  create_padding(out, aux);
+  create_padding(output);
+
+  /* for (int k = 0; k < PAD; k++) */
+  /* { */
+  /*   for (int j = 0; j < I->width; j++) */
+  /*   { */
+  /*     aux[(I->width)*k + j] = 1; */
+  /*     aux[(I->height)-(k+1)*I->width + j] = 1; */
+  /*   } */
+  /*   for (int i = 0; i < I->height; i++) */
+  /*   { */
+  /*     aux[i*I->width + k] = 1; */
+  /*     aux[I->width*i + (I->width - (k + 1))] = 1; */
+  /*   } */
+  /* } */
 
   for (int i = 0; i < n; i++)
   {
@@ -158,21 +182,21 @@ void blur_process(imagem *I, imagem *output, int n)
     /* Child process. */
     if (pid[i] == 0)
     {
-      for (int i = 0; i < (I->width)*(I->height); i++)
+      for (int j = 0; j < (I->width)*(I->height); j++)
       {
         pthread_mutex_lock(&key);
-        is_undone = (aux[i] == 0);
+        is_undone = (aux[j] == 0);
         if (is_undone)
-          aux[i] = 1;
+          aux[j] = 1;
         pthread_mutex_unlock(&key);
 
         if (is_undone)
         {
-          x = i/I->width;
-          y = i%I->width;
-          out->r[i] = blur(I->r, x, y, I->width, I->height);
-          out->b[i] = blur(I->b, x, y, I->width, I->height);
-          out->g[i] = blur(I->g, x, y, I->width, I->height);
+          x = j/(I->width);
+          y = j%(I->width);
+          output->r[j] = blur(I->r, x, y, I->width, I->height);
+          output->b[j] = blur(I->b, x, y, I->width, I->height);
+          output->g[j] = blur(I->g, x, y, I->width, I->height);
         }
       }
       exit(0);
@@ -180,12 +204,8 @@ void blur_process(imagem *I, imagem *output, int n)
   }
 
   /* Wait all processes to finish. */
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < n; i++)
     waitpid(pid[i], NULL, 0);
-
-
-  free(output);
-  output = out;
 }
 
 
@@ -210,8 +230,22 @@ void blur_thread(imagem *I, imagem *output, int n)
   for (int i = 0; i < (I->width * I->height); i++)
     aux[i] = 0;
 
-  create_padding(output, aux);
+  create_padding(output);
 
+  /* for (int k = 0; k < PAD; k++) */
+  /* { */
+  /*   for (int j = 0; j < I->width; j++) */
+  /*   { */
+  /*     aux[(I->width)*k + j] = 1; */
+  /*     aux[(I->height)-(k+1)*I->width + j] = 1; */
+  /*   } */
+  /*   for (int i = 0; i < I->height; i++) */
+  /*   { */
+  /*     aux[i*I->width + k] = 1; */
+  /*     aux[I->width*i + (I->width - (k + 1))] = 1; */
+  /*   } */
+  /* } */
+  /*  */
   argv->aux = aux;
   argv->img = I;
   argv->output = output;
@@ -230,7 +264,7 @@ void blur_thread(imagem *I, imagem *output, int n)
 void blur_image(imagem *I, imagem *output)
 {
 
-  create_padding(output, NULL);
+  create_padding(output);
 
   for(int i=PAD;i<I->height-2*PAD;i++)
   {
