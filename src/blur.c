@@ -3,7 +3,37 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+#define N 9
+#define PAD 2
+
 pthread_mutex_t key;
+
+void create_padding(imagem *I)
+{
+  for (int k = 0; k < PAD; k++)
+  {
+    for (int j = 0; j < I->width; j++)
+    {
+      I->r[(I->width)*k + j] = 0;
+      I->r[(I->height-k-1)*I->width + j] = 0;
+      I->g[(I->width)*k + j] = 0;
+      I->g[(I->height-k-1)*I->width + j] = 0;
+      I->b[(I->width)*k + j] = 0;
+      I->b[(I->height-k-1)*I->width + j] = 0;
+    }
+
+    for (int i = 0; i < I->height; i++)
+    {
+      I->r[i*I->width + k] = 0;
+      I->r[I->width*i + (I->width - k - 1)] = 0;
+      I->g[i*I->width + k] = 0;
+      I->g[I->width*i + (I->width - k - 1)] = 0;
+      I->b[i*I->width + k] = 0;
+      I->b[I->width*i + (I->width - k - 1)] = 0;
+    }
+  }
+}
+
 
 imagem *create_image(int width, int height)
 {
@@ -27,15 +57,15 @@ imagem *create_image(int width, int height)
 
 float blur(float *image, int x, int y, int width, int height)
 {
-  float total = image[(x+1)*width+y+1];
+  float total = 0;
   /* Average. */
-  float filter[25] = {
-            1/25,   1/25,   1/25,  1/25,  1/25,
-            1/25,   1/25,   1/25,  1/25,  1/25,
-            1/25,   1/25,   1/25,  1/25,  1/25,
-            1/25,   1/25,   1/25,  1/25,  1/25,
-            1/25,   1/25,   1/25,  1/25,  1/25
-            };
+  /* float filter[25] = { */
+  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
+  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
+  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
+  /*           1/25,   1/25,   1/25,  1/25,  1/25, */
+  /*           1/25,   1/25,   1/25,  1/25,  1/25 */
+  /*           }; */
 
   /* Gaussian. */
   /* float filter[25] = { */
@@ -46,9 +76,20 @@ float blur(float *image, int x, int y, int width, int height)
   /*           1/256,  4/256,  6/256,  4/256,  1/256 */
   /*           }; */
 
-  for(int i=-2; i < 3; i++)
-    for(int j =-2; j < 3; j++)
-      total += image[(x+i)*width+y+j] * filter[(2+i)*5+j+2];
+  float filter[N*N];
+
+  for (int i = 0; i < N*N; i++)
+    filter[i] = 1.0/((float) N*N);
+
+  /* int filter[25] = {   1,  1, 1,  1, 1, */
+  /*                        1,  1, 1,  1, 1, */
+  /*                        1,  1,-24, 1, 1, */
+  /*                        1,  1, 1,  1, 1, */
+  /*                        1,  1, 1,  1, 1}; */
+
+  for(int i=-N/2; i < N/2+1; i++)
+    for(int j =-N/2; j < N/2+1; j++)
+      total += image[(x+i)*width+y+j] * filter[(N/2+i)*N+j+N/2];
 
   if (total > 255)
     total = 255;
@@ -66,7 +107,7 @@ void *worker(void *arg)
   imagem *img = argv->img;
   imagem *output = argv->output;
 
-  for (int i; i < (img->width)*(img->height); i++)
+  for (int i = 0; i < (img->width)*(img->height); i++)
   {
     pthread_mutex_lock(&key);
     is_undone = (aux[i] == 0);
@@ -106,30 +147,7 @@ void blur_thread(imagem *I, imagem *output, int n)
   for (int i = 0; i < (I->width * I->height); i++)
     aux[i] = 0;
 
-  for (int j = 0; j < I->width; j++)
-  {
-    output->r[j] = 0;
-    output->r[(I->height-1)*I->width + j] = 0;
-    output->g[j] = 0;
-    output->g[(I->height-1)*I->width + j] = 0;
-    output->b[j] = 0;
-    output->b[(I->height-1)*I->width + j] = 0;
-    aux[j] = 1;
-    aux[(I->height-1)*I->width + j] = 1;
-  }
-
-  for (int i = 0; i < I->height; i++)
-  {
-    output->r[i*I->width] = 0;
-    output->r[I->width*i + (I->width - 1)] = 0;
-    output->g[i*I->width] = 0;
-    output->g[I->width*i + (I->width - 1)] = 0;
-    output->b[i*I->width] = 0;
-    output->b[I->width*i + (I->width - 1)] = 0;
-    aux[i*I->width] = 1;
-    aux[I->width*i + (I->width - 1)] = 1;
-  }
-
+  create_padding(output);
 
   argv->aux = aux;
   argv->img = I;
@@ -148,38 +166,17 @@ void blur_thread(imagem *I, imagem *output, int n)
 
 void blur_image(imagem *I, imagem *output)
 {
-  /* imagem *output; */
-  /* output = create_image(I->width, I->height); */
 
-  for (int j = 0; j < I->width; j++)
-  {
-    output->r[j] = 0;
-    output->r[(I->height-1)*I->width + j] = 0;
-    output->g[j] = 0;
-    output->g[(I->height-1)*I->width + j] = 0;
-    output->b[j] = 0;
-    output->b[(I->height-1)*I->width + j] = 0;
-  }
+  create_padding(output);
 
-  for (int i = 0; i < I->height; i++)
+  for(int i=PAD;i<I->height-2*PAD;i++)
   {
-    output->r[i*I->width] = 0;
-    output->r[I->width*i + (I->width - 1)] = 0;
-    output->g[i*I->width] = 0;
-    output->g[I->width*i + (I->width - 1)] = 0;
-    output->b[i*I->width] = 0;
-    output->b[I->width*i + (I->width - 1)] = 0;
-  }
-
-  for(int i=1;i<I->height-2;i++)
-  {
-    for(int j=1;j<I->width-2;j++)
+    for(int j=PAD;j<I->width-2*PAD;j++)
     {
       output->r[i*I->width+j] = blur(I->r, i, j, I->width, I->height);
       output->b[i*I->width+j] = blur(I->b, i, j, I->width, I->height);
       output->g[i*I->width+j] = blur(I->g, i, j, I->width, I->height);
     }
   }
-  /* liberar_imagem(I); */
-  /* I = output; */
 }
+

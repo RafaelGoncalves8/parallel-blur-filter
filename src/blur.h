@@ -6,6 +6,8 @@ typedef struct {
   imagem * output;
 } args;
 
+void create_padding(imagem *I);
+
 void blur_image(imagem *I, imagem*);
 
 float blur(float *image, int x, int y, int width, int height);

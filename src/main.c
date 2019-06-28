@@ -46,6 +46,8 @@ int main(int argc, char *argv[]) {
 
     strcpy(str, "out/");
     cut_last_word('/', argv[i], last_word);
+    strcat(str, argv[1]);
+    strcat(str, "_");
     strcat(str, last_word);
     salvar_imagem(str, out);
   }
